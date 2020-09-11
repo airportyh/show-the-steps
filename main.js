@@ -421,7 +421,7 @@ async function subtraction(canvas, ctx) {
     let x;
     let y;
     let inputComplete;
-    let carries;
+    let borrows;
     let leftovers = "";
     let result;
     let negativeAnswer = false;
@@ -433,7 +433,7 @@ async function subtraction(canvas, ctx) {
         x = "";
         y = "";
         inputComplete = false;
-        carries = " ";
+        borrows = " ";
         result = "";
         render();
         
@@ -470,10 +470,12 @@ async function subtraction(canvas, ctx) {
         
         if (isLessThan(x, y)) {
             await waitForEvent("keypress");
-            negativeAnswer = true;
             const temp = x;
             x = y;
             y = temp;
+            render();
+            await waitForEvent("keypress");
+            negativeAnswer = true;
             render();
         }
         
@@ -481,22 +483,28 @@ async function subtraction(canvas, ctx) {
         let digitY = null;
         let _ = null;
         let place = 1;
-        let carry = "0";
+        let borrow = "0";
         while (place <= x.length || place <= y.length) {
             await waitForEvent("keypress");
             digitX = x[x.length - place] || "0";
             digitY = y[y.length - place] || "0";
-            const [digitXAfterCarry, _] = SUBTRACTION_TABLE[digitX + carry];
+            const [digitXAfterBorrow, _] = SUBTRACTION_TABLE[digitX + borrow];
             let resultDigit;
-            [resultDigit, carry] = SUBTRACTION_TABLE[digitXAfterCarry + digitY];
-            carries = carries + carry;
-            if (digitXAfterCarry !== digitX) {
-                leftovers = leftovers + digitXAfterCarry;
+            [resultDigit, borrow] = SUBTRACTION_TABLE[digitXAfterBorrow + digitY];
+            if (digitXAfterBorrow !== digitX) {
+                leftovers = leftovers + digitXAfterBorrow;
                 render();
                 await waitForEvent("keypress");
             } else {
                 leftovers = leftovers + " ";
             }
+            
+            if (borrow != "0") {
+                borrows = borrows + borrow;
+                render();
+                await waitForEvent("keypress");
+            }
+            
             result = resultDigit + result;
             render();
             place++;
@@ -586,13 +594,13 @@ async function subtraction(canvas, ctx) {
         }
         const digitWidth = ctx.measureText("0").width;
         
-        // render carries
+        // render borrows
         ctx.font = `${subscriptTextSize}px ${FONT_FAMILY}`;
-        for (let i = 0; i < carries.length; i++) {
-            const carry = carries[i];
-            if (carry !== " " && carry !== "0") {
+        for (let i = 0; i < borrows.length; i++) {
+            const borrow = borrows[i];
+            if (borrow !== " " && borrow !== "0") {
                 ctx.fillText(
-                    carry,
+                    borrow,
                     canvas.width - padding - i * digitWidth - subscriptTextSize * 0.3,
                     padding + 2 * textSize + lineSpacing * 0.5
                 );
