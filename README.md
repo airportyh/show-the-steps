@@ -8,12 +8,9 @@ before submitting their answers.
 
 ## TODO
 
-* dynamic font sizing (done)
 * instructions / help
-* more operations
-    * subtract (done)
-    * multiply
-    * divide
+* rewind
 * better canvas rendering resolution retina displays
-* indicator showing completion
+* multiply
+* divide
 * dynamic sizing of canvas to the window size
