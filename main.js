@@ -282,7 +282,7 @@ async function addition(canvas, ctx) {
                 x += press.key;
             }
             render();
-            if (press.key === "Enter") {
+            if (press.key === "Enter" && x.length > 0) {
                 break;
             }
         }
@@ -296,9 +296,8 @@ async function addition(canvas, ctx) {
                 y += press.key;
             }
             render();
-            if (press.key === "Enter") {
+            if (press.key === "Enter" && y.length > 0) {
                 break;
-                
             }
         }
         
@@ -443,7 +442,7 @@ async function subtraction(canvas, ctx) {
                 x += press.key;
             }
             render();
-            if (press.key === "Enter") {
+            if (press.key === "Enter" && x.length > 0) {
                 break;
             }
         }
@@ -457,9 +456,8 @@ async function subtraction(canvas, ctx) {
                 y += press.key;
             }
             render();
-            if (press.key === "Enter") {
+            if (press.key === "Enter" && y.length > 0) {
                 break;
-                
             }
         }
         
