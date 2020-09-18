@@ -258,7 +258,6 @@ function displayMenu(canvas, ctx) {
 }
 
 async function addition(canvas, ctx) {
-    const history = [];
     let state = {
         instruction: "Type a number and ENTER",
         x: "",
@@ -268,57 +267,96 @@ async function addition(canvas, ctx) {
         result: ""
     };
     
-    render();
+    render(state);
     
     await inputNumber(state, "x", render);
     
     state.instruction = "Type another number and ENTER";
-    render();
+    render(state);
     
     await inputNumber(state, "y", render);
     
     state.inputComplete = true;
     state.instruction = "⇽ last step           ⇾ next step";
     
-    render();
+    render(state);
+    const steps = addProcedure(state);
+    await executeStepsWithRewind(steps, render);
     
-    let digitX = null;
-    let digitY = null;
-    let _ = null;
-    let place = 1;
-    let carry = "0";
-    while (place <= state.x.length || place <= state.y.length) {
-        const press = await waitForEvent("keydown");
-        if (press.key === "ArrowRight") {
+    function *addProcedure(state) {
+        let digitX = null;
+        let digitY = null;
+        let _ = null;
+        let place = 1;
+        let carry = "0";
+        let instruction;
+        yield state;
+        while (place <= state.x.length || place <= state.y.length) {
             digitX = state.x[state.x.length - place] || "0";
             digitY = state.y[state.y.length - place] || "0";
+            let resultDigit;
+            let carryB;
+            let tempAnswer;
             const [resultDigitA, carryA] = ADDITION_TABLE[digitX + digitY];
-            const [resultDigit, carryB] = ADDITION_TABLE[resultDigitA + carry];
-            [carry, _] = ADDITION_TABLE[carryA + carryB];
-            state = update({
-                carries: carry + state.carries,
-                result: resultDigit + state.result
-            }, state, history);
-            render();
+            tempAnswer = (carryA == "0" ? "" : carryA) + resultDigitA;
+            state = {
+                ...state,
+                instruction: `${digitX} + ${digitY} = ${tempAnswer}`
+            };
+            yield state;
+            
+            if (carry !== "0") {
+                let carryB;
+                [resultDigit, carryB] = ADDITION_TABLE[resultDigitA + carry];
+                [carry, _] = ADDITION_TABLE[carryA + carryB];
+                const answerFinalStep = (carry == "0" ? "": carry) + resultDigit;
+                state = {
+                    ...state,
+                    instruction: `from ${tempAnswer}, add the carry to get ${answerFinalStep}`
+                };
+                tempAnswer = answerFinalStep;
+                yield state;
+            } else {
+                resultDigit = resultDigitA;
+                carry = carryA;
+            }
+            if (carry !== "0") {
+                state = {
+                    ...state,
+                    carries: carry + state.carries,
+                    instruction: `from ${tempAnswer}, carry ${carry} over`
+                };
+                yield state;
+            }
+            state = {
+                ...state,
+                result: resultDigit + state.result,
+                instruction: state.instruction + `, put ${resultDigit} in here`
+            };
+            yield state;
             place++;
-        } else if (press.key === "ArrowLeft") {
         }
+        
+        if (carry !== "0") {
+            state = {
+                ...state,
+                result: carry + state.result,
+                instruction: `extra carry goes in here`
+            };
+            yield state;
+        }
+        
+        state = {
+            ...state,
+            instruction: "That's the final answer!"
+        }
+        
+        yield state;
+        
+        return state;
     }
     
-    if (carry != "0") {
-        await waitForEvent("keypress");
-        state = update({
-            result: carry + state.result
-        }, state, history);
-    }
-    
-    state.instruction = "That's the final answer!";
-    
-    render();
-    
-    await waitForEvent("keypress");
-    
-    function render() {
+    function render(state) {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = `100px ${FONT_FAMILY}`;
@@ -337,7 +375,7 @@ async function addition(canvas, ctx) {
         ctx.fillStyle = "black";
         ctx.textBaseline = "top";
         
-        ctx.font = `40px ${FONT_FAMILY}`;
+        ctx.font = `35px ${FONT_FAMILY}`;
         ctx.fillText(
             state.instruction,
             padding,
@@ -398,66 +436,48 @@ async function addition(canvas, ctx) {
 }
 
 async function subtraction(canvas, ctx) {
-    let instruction;
-    let x;
-    let y;
-    let inputComplete;
-    let borrows;
-    let leftovers = "";
-    let result;
-    let negativeAnswer = false;
+    let state = {
+        instruction: "Type a number and ENTER",
+        x: "",
+        y: "",
+        inputComplete: false,
+        borrows: "",
+        result: "",
+        negativeAnswer: false,
+        leftovers: ""
+    };
     
-    await performSubtract();
+    render(state);
     
-    async function performSubtract() {
-        instruction = "Type a number and ENTER";
-        x = "";
-        y = "";
-        inputComplete = false;
-        borrows = " ";
-        result = "";
-        render();
-        
-        while (true) {
-            const press = await waitForEvent("keypress");
-            if (press.key.match(/^[0-9]$/)) {
-                x += press.key;
-            }
-            render();
-            if (press.key === "Enter" && x.length > 0) {
-                break;
-            }
-        }
-        
-        instruction = "Type another number and ENTER";
-        render();
-        
-        while (true) {
-            const press = await waitForEvent("keypress");
-            if (press.key.match(/^[0-9]$/)) {
-                y += press.key;
-            }
-            render();
-            if (press.key === "Enter" && y.length > 0) {
-                break;
-            }
-        }
-        
-        inputComplete = true;
-        
-        instruction = "Any key to reveal the next step…";
-        render();
-        
-        if (isLessThan(x, y)) {
+    await inputNumber(state, "x", render);
+    
+    state.instruction = "Type another number and ENTER";
+    render(state);
+    
+    await inputNumber(state, "y", render);
+    
+    state.inputComplete = true;
+    
+    state.instruction = "⇽ last step           ⇾ next step";
+    
+    render(state);
+    const steps = subtractProcedure(state);
+    await executeStepsWithRewind(steps, render);
+    
+    function *subtractProcedure(state) {
+        if (isLessThan(state.x, state.y)) {
             // Swap the numbers
-            await waitForEvent("keypress");
-            const temp = x;
-            x = y;
-            y = temp;
-            render();
-            await waitForEvent("keypress");
-            negativeAnswer = true;
-            render();
+            yield state;
+            state = {
+                ...state,
+                x: state.y,
+                y: state.x
+            };
+            yield state;
+            state = {
+                ...state,
+                negativeAnswer: true
+            };
         }
         
         let digitX = null;
@@ -465,42 +485,56 @@ async function subtraction(canvas, ctx) {
         let _ = null;
         let place = 1;
         let borrow = "0";
-        while (place <= x.length || place <= y.length) {
-            await waitForEvent("keypress");
-            digitX = x[x.length - place] || "0";
-            digitY = y[y.length - place] || "0";
+        yield state;
+        while (place <= state.x.length || place <= state.y.length) {
+            digitX = state.x[state.x.length - place] || "0";
+            digitY = state.y[state.y.length - place] || "0";
             const [digitXAfterBorrow, _] = SUBTRACTION_TABLE[digitX + borrow];
             let resultDigit;
             [resultDigit, borrow] = SUBTRACTION_TABLE[digitXAfterBorrow + digitY];
             if (digitXAfterBorrow !== digitX) {
-                leftovers = leftovers + digitXAfterBorrow;
-                render();
-                await waitForEvent("keypress");
+                state = {
+                    ...state,
+                    leftovers: state.leftovers + digitXAfterBorrow
+                };
+                yield state;
             } else {
-                leftovers = leftovers + " ";
+                state = {
+                    ...state,
+                    leftovers: state.leftovers + " "
+                };
             }
             
             if (borrow != "0") {
-                borrows = borrows + borrow;
-                render();
-                await waitForEvent("keypress");
+                state = {
+                    ...state,
+                    borrows: state.borrows + borrow
+                };
+                yield state;
             }
-            
-            result = resultDigit + result;
-            render();
+            state = {
+                ...state,
+                result: resultDigit + state.result
+            };
+            yield state;
             place++;
         }
         
-        if (result[0] === "0") {
-            await waitForEvent("keypress");
-            result = result.slice(1);
+        if (state.result[0] === "0") {
+            state = {
+                ...state,
+                result: state.result.slice(1)
+            };
+            yield state;
         }
         
-        instruction = "That's the final answer!";
+        state = {
+            ...state,
+            instruction: "That's the final answer!"
+        };
+        yield state;
         
-        render();
-        
-        await waitForEvent("keypress");
+        return state;
     }
     
     function isLessThan(one, other) {
@@ -518,14 +552,14 @@ async function subtraction(canvas, ctx) {
         }
     }
     
-    function render() {
+    function render(state) {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = `100px ${FONT_FAMILY}`;
         const ratio = ctx.measureText("0").width / 100;
         
         const textSize1 = canvas.height / 7.2;
-        const maxTextLength = inputComplete ? ("- " + y).length : Math.max(x.length, y.length);
+        const maxTextLength = state.inputComplete ? ("- " + state.y).length : Math.max(state.x.length, state.y.length);
         const textSize2 = canvas.width / (1 + maxTextLength * ratio);
         const textSize = Math.min(textSize1, textSize2);
         const subscriptTextSize = textSize * 0.2;
@@ -539,28 +573,28 @@ async function subtraction(canvas, ctx) {
         
         ctx.font = `40px ${FONT_FAMILY}`;
         ctx.fillText(
-            instruction,
+            state.instruction,
             padding,
             padding
         );
         
         ctx.font = `${textSize}px ${FONT_FAMILY}`;
         ctx.fillText(
-            x, 
-            canvas.width - padding - ctx.measureText(x).width, 
+            state.x, 
+            canvas.width - padding - ctx.measureText(state.x).width, 
             padding + 2 * textSize
         );
         
-        if (inputComplete) {
+        if (state.inputComplete) {
             ctx.fillText(
-                "- " + y,
-                canvas.width - padding - ctx.measureText("- " + y).width,
+                "- " + state.y,
+                canvas.width - padding - ctx.measureText("- " + state.y).width,
                 padding + 3 * textSize + lineSpacing
             );
             ctx.beginPath();
             ctx.lineWidth = 5;
             ctx.moveTo(
-                canvas.width - padding - ctx.measureText("- " + y).width, 
+                canvas.width - padding - ctx.measureText("- " + state.y).width, 
                 padding + 4 * textSize + lineSpacing + dividerHeight);
             ctx.lineTo(
                 canvas.width - padding, 
@@ -568,8 +602,8 @@ async function subtraction(canvas, ctx) {
             ctx.stroke();
         } else {
             ctx.fillText(
-                y, 
-                canvas.width - padding - ctx.measureText(y).width, 
+                state.y, 
+                canvas.width - padding - ctx.measureText(state.y).width, 
                 padding + 3 * textSize + lineSpacing
             );
         }
@@ -577,12 +611,12 @@ async function subtraction(canvas, ctx) {
         
         // render borrows
         ctx.font = `${subscriptTextSize}px ${FONT_FAMILY}`;
-        for (let i = 0; i < borrows.length; i++) {
-            const borrow = borrows[i];
+        for (let i = 0; i < state.borrows.length; i++) {
+            const borrow = state.borrows[i];
             if (borrow !== " " && borrow !== "0") {
                 ctx.fillText(
                     borrow,
-                    canvas.width - padding - i * digitWidth - subscriptTextSize * 0.3,
+                    canvas.width - padding - (i + 1) * digitWidth - subscriptTextSize * 0.3,
                     padding + 2 * textSize + lineSpacing * 0.5
                 );
             }
@@ -590,8 +624,8 @@ async function subtraction(canvas, ctx) {
         
         // render leftovers
         ctx.font = `${textSize}px ${FONT_FAMILY}`;
-        for (let i = 0; i < leftovers.length; i++) {
-            const leftover = leftovers[i];
+        for (let i = 0; i < state.leftovers.length; i++) {
+            const leftover = state.leftovers[i];
             if (leftover !== " ") {
                 ctx.beginPath();
                 ctx.moveTo(canvas.width - padding - i * digitWidth, padding + 3 * textSize);
@@ -607,18 +641,18 @@ async function subtraction(canvas, ctx) {
         
         ctx.font = `${textSize}px ${FONT_FAMILY}`;
         
-        if (negativeAnswer) {
+        if (state.negativeAnswer) {
             ctx.fillText(
                 "-", 
-                canvas.width - padding - ctx.measureText("- " + y).width, 
+                canvas.width - padding - ctx.measureText("- " + state.y).width, 
                 padding + 4 * textSize + 2 * lineSpacing + dividerHeight
             );
         }
         
-        if (result) {
+        if (state.result) {
             ctx.fillText(
-                result, 
-                canvas.width - padding - ctx.measureText(result).width, 
+                state.result, 
+                canvas.width - padding - ctx.measureText(state.result).width, 
                 padding + 4 * textSize + 2 * lineSpacing + dividerHeight
             );
         }
@@ -644,19 +678,49 @@ async function inputNumber(state, prop, render) {
         if (press.key.match(/^[0-9]$/)) {
             state[prop] += press.key;
         }
-        render();
+        render(state);
         if (press.key === "Enter" && state[prop].length > 0) {
             break;
         }
     }
 }
 
-function update(changes, state, history) {
-    history.push(state);
-    return {
-        ...state,
-        ...changes
-    };
+async function executeStepsWithRewind(steps, render) {
+    const history = [];
+    let historyCursor = -1;
+    const result = steps.next();
+    if (result.done) {
+        return;
+    }
+    let state = result.value;
+    historyCursor = history.push(state) - 1;
+    render(state);
+    while (true) {
+        const press = await waitForEvent("keyup");
+        if (press.key === "ArrowRight") {
+            if (historyCursor < history.length - 1) {
+                historyCursor++;
+                state = history[historyCursor];
+                render(state);
+            } else {
+                // we are at the end of the history queue, perform the next step
+                const result = steps.next();
+                state = result.value;
+                historyCursor = history.push(state) - 1;
+                render(state);
+                if (result.done) {
+                    break;
+                }
+            }
+        } else if (press.key === "ArrowLeft") {
+            if (historyCursor <= 0) {
+                continue;
+            }
+            historyCursor--;
+            state = history[historyCursor];
+            render(state);
+        }
+    }
 }
 
 function waitForEvent(eventName, element = window) {

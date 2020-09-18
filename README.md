@@ -8,6 +8,7 @@ before submitting their answers.
 
 ## TODO
 
+* use a more common font
 * instructions / help
 * rewind
 * better canvas rendering resolution retina displays
