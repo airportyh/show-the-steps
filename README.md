@@ -8,10 +8,10 @@ before submitting their answers.
 
 ## TODO
 
+* instructions / help (partially done)
 * use a more common font
-* instructions / help
-* rewind
 * better canvas rendering resolution retina displays
 * multiply
 * divide
 * dynamic sizing of canvas to the window size
+* rewind (done)
