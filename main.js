@@ -258,83 +258,65 @@ function displayMenu(canvas, ctx) {
 }
 
 async function addition(canvas, ctx) {
-    let instruction;
-    let x;
-    let y;
-    let inputComplete;
-    let carries;
-    let result;
+    const history = [];
+    let state = {
+        instruction: "Type a number and ENTER",
+        x: "",
+        y: "",
+        inputComplete: false,
+        carries: "",
+        result: ""
+    };
     
-    await performAdd();
+    render();
     
-    async function performAdd() {
-        instruction = "Type a number and ENTER";
-        x = "";
-        y = "";
-        inputComplete = false;
-        carries = "";
-        result = "";
-        render();
-        
-        while (true) {
-            const press = await waitForEvent("keypress");
-            if (press.key.match(/^[0-9]$/)) {
-                x += press.key;
-            }
-            render();
-            if (press.key === "Enter" && x.length > 0) {
-                break;
-            }
-        }
-        
-        instruction = "Type another number and ENTER";
-        render();
-        
-        while (true) {
-            const press = await waitForEvent("keypress");
-            if (press.key.match(/^[0-9]$/)) {
-                y += press.key;
-            }
-            render();
-            if (press.key === "Enter" && y.length > 0) {
-                break;
-            }
-        }
-        
-        inputComplete = true;
-        
-        instruction = "Any key to reveal the next step…";
-        render();
-        
-        let digitX = null;
-        let digitY = null;
-        let _ = null;
-        let place = 1;
-        let carry = "0";
-        while (place <= x.length || place <= y.length) {
-            await waitForEvent("keypress");
-            digitX = x[x.length - place] || "0";
-            digitY = y[y.length - place] || "0";
+    await inputNumber(state, "x", render);
+    
+    state.instruction = "Type another number and ENTER";
+    render();
+    
+    await inputNumber(state, "y", render);
+    
+    state.inputComplete = true;
+    state.instruction = "⇽ last step           ⇾ next step";
+    
+    render();
+    
+    let digitX = null;
+    let digitY = null;
+    let _ = null;
+    let place = 1;
+    let carry = "0";
+    while (place <= state.x.length || place <= state.y.length) {
+        const press = await waitForEvent("keydown");
+        if (press.key === "ArrowRight") {
+            digitX = state.x[state.x.length - place] || "0";
+            digitY = state.y[state.y.length - place] || "0";
             const [resultDigitA, carryA] = ADDITION_TABLE[digitX + digitY];
             const [resultDigit, carryB] = ADDITION_TABLE[resultDigitA + carry];
             [carry, _] = ADDITION_TABLE[carryA + carryB];
-            carries = carry + carries;
-            result = resultDigit + result;
+            state = update({
+                carries: carry + state.carries,
+                result: resultDigit + state.result
+            }, state, history);
             render();
             place++;
+        } else if (press.key === "ArrowLeft") {
         }
-        
-        if (carry != "0") {
-            await waitForEvent("keypress");
-            result = carry + result;
-        }
-        
-        instruction = "That's the final answer!";
-        
-        render();
-        
-        await waitForEvent("keypress");
     }
+    
+    if (carry != "0") {
+        await waitForEvent("keypress");
+        state = update({
+            result: carry + state.result
+        }, state, history);
+    }
+    
+    state.instruction = "That's the final answer!";
+    
+    render();
+    
+    await waitForEvent("keypress");
     
     function render() {
         ctx.fillStyle = "white";
@@ -343,7 +325,7 @@ async function addition(canvas, ctx) {
         const ratio = ctx.measureText("0").width / 100;
         
         const textSize1 = canvas.height / 6.2;
-        const maxTextLength = inputComplete ? ("+ " + y).length : Math.max(x.length, y.length);
+        const maxTextLength = state.inputComplete ? ("+ " + state.y).length : Math.max(state.x.length, state.y.length);
         const textSize2 = canvas.width / (1 + maxTextLength * ratio);
         const textSize = Math.min(textSize1, textSize2);
         const subscriptTextSize = textSize * 0.2;
@@ -357,28 +339,28 @@ async function addition(canvas, ctx) {
         
         ctx.font = `40px ${FONT_FAMILY}`;
         ctx.fillText(
-            instruction,
+            state.instruction,
             padding,
             padding
         );
         
         ctx.font = `${textSize}px ${FONT_FAMILY}`;
         ctx.fillText(
-            x, 
-            canvas.width - padding - ctx.measureText(x).width, 
+            state.x, 
+            canvas.width - padding - ctx.measureText(state.x).width, 
             padding + textSize
         );
         
-        if (inputComplete) {
+        if (state.inputComplete) {
             ctx.fillText(
-                "+ " + y,
-                canvas.width - padding - ctx.measureText("+ " + y).width,
+                "+ " + state.y,
+                canvas.width - padding - ctx.measureText("+ " + state.y).width,
                 padding + 2 * textSize + lineSpacing
             );
             ctx.beginPath();
             ctx.lineWidth = 5;
             ctx.moveTo(
-                canvas.width - padding - ctx.measureText("+ " + y).width, 
+                canvas.width - padding - ctx.measureText("+ " + state.y).width, 
                 padding + 3 * textSize + lineSpacing + dividerHeight);
             ctx.lineTo(
                 canvas.width - padding, 
@@ -386,16 +368,16 @@ async function addition(canvas, ctx) {
             ctx.stroke();
         } else {
             ctx.fillText(
-                y, 
-                canvas.width - padding - ctx.measureText(y).width, 
+                state.y, 
+                canvas.width - padding - ctx.measureText(state.y).width, 
                 padding + 2 * textSize + lineSpacing
             );
         }
         const digitWidth = ctx.measureText("0").width;
-        const startXOffset = canvas.width - padding - ctx.measureText(carries).width;
+        const startXOffset = canvas.width - padding - ctx.measureText(state.carries).width;
         ctx.font = `${subscriptTextSize}px ${FONT_FAMILY}`;
-        for (let i = 0; i < carries.length; i++) {
-            const carry = carries[i];
+        for (let i = 0; i < state.carries.length; i++) {
+            const carry = state.carries[i];
             if (carry !== "0") {
                 ctx.fillText(
                     carry, 
@@ -405,10 +387,10 @@ async function addition(canvas, ctx) {
             }
         }
         ctx.font = `${textSize}px ${FONT_FAMILY}`;
-        if (result) {
+        if (state.result) {
             ctx.fillText(
-                result, 
-                canvas.width - padding - ctx.measureText(result).width, 
+                state.result, 
+                canvas.width - padding - ctx.measureText(state.result).width, 
                 padding + 3 * textSize + 2 * lineSpacing + dividerHeight
             );
         }
@@ -467,6 +449,7 @@ async function subtraction(canvas, ctx) {
         render();
         
         if (isLessThan(x, y)) {
+            // Swap the numbers
             await waitForEvent("keypress");
             const temp = x;
             x = y;
@@ -653,6 +636,27 @@ function createCanvas() {
     
     const ctx = canvas.getContext("2d");
     return [canvas, ctx];
+}
+
+async function inputNumber(state, prop, render) {
+    while (true) {
+        const press = await waitForEvent("keypress");
+        if (press.key.match(/^[0-9]$/)) {
+            state[prop] += press.key;
+        }
+        render();
+        if (press.key === "Enter" && state[prop].length > 0) {
+            break;
+        }
+    }
+}
+
+function update(changes, state, history) {
+    history.push(state);
+    return {
+        ...state,
+        ...changes
+    };
 }
 
 function waitForEvent(eventName, element = window) {
